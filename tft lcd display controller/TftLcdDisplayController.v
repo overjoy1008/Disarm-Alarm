@@ -8,10 +8,9 @@ module TftLcdDisplayController(
     output wire dclk,
     output wire disp_en
 );
-
     wire [10:0] counter_h;
     wire [9:0] counter_v;
-
+    
     // Instantiate the TFT LCD controller
     TFT_LCD_controller ctl(
         .clk(clk),
@@ -25,6 +24,19 @@ module TftLcdDisplayController(
         .disp_enb(disp_en)
     );
 
+    // Define the display area boundaries
+    parameter DISPLAY_START_H = 'd210;
+    parameter DISPLAY_END_H = 'd1010;
+    parameter DISPLAY_START_V = 'd22;
+    parameter DISPLAY_END_V = 'd480;
+    
+    // Define the border thickness
+    parameter BORDER_THICKNESS = 'd3;
+    
+    // Define the trident dimensions
+    parameter TRIDENT_CENTER_H = (DISPLAY_END_H + DISPLAY_START_H) / 2;
+    parameter TRIDENT_CENTER_V = (DISPLAY_END_V + DISPLAY_START_V) / 2;
+    
     // RGB color control logic
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -34,71 +46,71 @@ module TftLcdDisplayController(
         end
         else begin
             if (den) begin
-                if (counter_v >= 'd22 && counter_v < 'd240) begin
-                    if (counter_h >= 'd210 && counter_h < 'd310) begin
-                        // Black
+                if (counter_v >= DISPLAY_START_V && counter_v < DISPLAY_END_V &&
+                    counter_h >= DISPLAY_START_H && counter_h < DISPLAY_END_H) begin
+                    
+                    // Border logic
+                    if (counter_h < DISPLAY_START_H + BORDER_THICKNESS ||       // Left border
+                        counter_h >= DISPLAY_END_H - BORDER_THICKNESS ||        // Right border
+                        counter_v < DISPLAY_START_V + BORDER_THICKNESS ||       // Top border
+                        counter_v >= DISPLAY_END_V - BORDER_THICKNESS) begin    // Bottom border
+                        // Black border
                         R <= 8'd0;
                         G <= 8'd0;
                         B <= 8'd0;
                     end
-                    else if (counter_h >= 'd310 && counter_h < 'd410) begin
-                        // Blue
+                    // Edge lines logic
+                    else if (
+                        // Top edge line
+                        (counter_v >= DISPLAY_START_V + 100 && 
+                         counter_v < DISPLAY_START_V + 100 + BORDER_THICKNESS) ||
+                        // Bottom edge line
+                        (counter_v >= DISPLAY_END_V - 100 - BORDER_THICKNESS &&
+                         counter_v < DISPLAY_END_V - 100) ||
+                        // Left edge line
+                        (counter_h >= DISPLAY_START_H + 100 &&
+                         counter_h < DISPLAY_START_H + 100 + BORDER_THICKNESS) ||
+                        // Right edge line
+                        (counter_h >= DISPLAY_END_H - 100 - BORDER_THICKNESS &&
+                         counter_h < DISPLAY_END_H - 100)
+                    ) begin
+                        // Black edge lines
                         R <= 8'd0;
                         G <= 8'd0;
-                        B <= 8'd255;
-                    end
-                    else if (counter_h >= 'd410 && counter_h < 'd510) begin
-                        // Green
-                        R <= 8'd0;
-                        G <= 8'd255;
                         B <= 8'd0;
                     end
-                    else if (counter_h >= 'd510 && counter_h < 'd610) begin
-                        // Sky Blue (Light Blue)
+                    // Center pattern logic
+                    else if (
+                        // Vertical line
+                        (counter_h >= TRIDENT_CENTER_H - BORDER_THICKNESS && 
+                         counter_h < TRIDENT_CENTER_H + BORDER_THICKNESS &&
+                         counter_v >= TRIDENT_CENTER_V - 80 &&
+                         counter_v < TRIDENT_CENTER_V + 50) ||
+                        // Left line
+                        (counter_h >= TRIDENT_CENTER_H - 30 - BORDER_THICKNESS &&
+                         counter_h < TRIDENT_CENTER_H - 30 + BORDER_THICKNESS &&
+                         counter_v >= TRIDENT_CENTER_V - 50 &&
+                         counter_v < TRIDENT_CENTER_V) ||
+                        // Right line
+                        (counter_h >= TRIDENT_CENTER_H + 30 - BORDER_THICKNESS &&
+                         counter_h < TRIDENT_CENTER_H + 30 + BORDER_THICKNESS &&
+                         counter_v >= TRIDENT_CENTER_V - 50 &&
+                         counter_v < TRIDENT_CENTER_V)
+                    ) begin
+                        // Black center pattern
                         R <= 8'd0;
-                        G <= 8'd238;
-                        B <= 8'd255;
-                    end
-                    else if (counter_h >= 'd610 && counter_h < 'd710) begin
-                        // Red
-                        R <= 8'd255;
                         G <= 8'd0;
                         B <= 8'd0;
-                    end
-                    else if (counter_h >= 'd710 && counter_h < 'd810) begin
-                        // Purple
-                        R <= 8'd138;
-                        G <= 8'd69;
-                        B <= 8'd238;
-                    end
-                    else if (counter_h >= 'd810 && counter_h < 'd910) begin
-                        // Yellow
-                        R <= 8'd255;
-                        G <= 8'd212;
-                        B <= 8'd0;
-                    end
-                    else if (counter_h >= 'd910 && counter_h < 'd1010) begin
-                        // White
-                        R <= 8'd255;
-                        G <= 8'd255;
-                        B <= 8'd255;
                     end
                     else begin
-                        // Black for other regions
-                        R <= 8'd0;
+                        // Red background
+                        R <= 8'd255;
                         G <= 8'd0;
                         B <= 8'd0;
                     end
                 end
-                else if (counter_v >= 'd240 && counter_v < 'd480) begin
-                    // Your code for the next vertical section will go here
-                    // Default to black for now
-                    R <= 8'd0;
-                    G <= 8'd0;
-                    B <= 8'd0;
-                end
                 else begin
-                    // Black outside vertical range
+                    // Black outside display area
                     R <= 8'd0;
                     G <= 8'd0;
                     B <= 8'd0;
@@ -112,5 +124,4 @@ module TftLcdDisplayController(
             end
         end
     end
-
 endmodule

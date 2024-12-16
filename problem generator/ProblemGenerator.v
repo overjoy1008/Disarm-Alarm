@@ -22,6 +22,7 @@ module ProblemGenerator(
     reg [7:0] processed_num1, processed_num2;
     reg [2:0] processed_op;
     reg [7:0] temp_num2;
+    reg is_valid_result;
     
     // LFSR 인스턴스들
     LFSR8 lfsr1(
@@ -86,6 +87,41 @@ module ProblemGenerator(
             endcase
         end
     endfunction
+
+    // 결과값 유효성 검사
+    always @(*) begin
+        is_valid_result = 0;  // 기본값은 invalid
+        
+        case(processed_op)
+            3'b000: begin // 덧셈
+                if(processed_num1 + processed_num2 <= 8'hFF)
+                    is_valid_result = 1;
+            end
+            
+            3'b001: begin // 뺄셈
+                if(processed_num1 >= processed_num2)
+                    is_valid_result = 1;
+            end
+            
+            3'b010: begin // 곱셈
+                if(processed_num1 * processed_num2 <= 8'hFF)
+                    is_valid_result = 1;
+            end
+            
+            3'b011: begin // 나눗셈
+                if(processed_num2 != 0 && processed_num1 >= processed_num2 && 
+                   processed_num1 % processed_num2 == 0)
+                    is_valid_result = 1;
+            end
+            
+            3'b100: begin // 나머지
+                if(processed_num2 != 0 && processed_num1 >= processed_num2)
+                    is_valid_result = 1;
+            end
+            
+            default: is_valid_result = 0;
+        endcase
+    end
     
     // 상태 레지스터
     always @(posedge clk or posedge rst) begin
@@ -102,19 +138,19 @@ module ProblemGenerator(
                 next_state = GEN_NUMS;
             
             GEN_NUMS: 
-                if(wait_count == 4'h3) // 3클럭 대기
+                if(wait_count == 4'h3)
                     next_state = CALCULATE;
                 else
                     next_state = GEN_NUMS;
             
             CALCULATE:
-                if(wait_count == 4'h3) // 3클럭 대기
+                if(wait_count == 4'h3)
                     next_state = CHECK;
                 else
                     next_state = CALCULATE;
             
             CHECK: begin
-                if(alu_result <= 8'hFF && alu_result >= 8'h0)
+                if(is_valid_result)
                     next_state = DONE;
                 else if(retry_count == 4'hA)
                     next_state = DONE;
@@ -157,18 +193,7 @@ module ProblemGenerator(
                     if(wait_count == 4'h3) begin
                         processed_op <= lfsr2_out[2:0] % 5;
                         processed_num1 <= process_num1(lfsr1_out, processed_op);
-                        temp_num2 <= process_num2(lfsr3_out, processed_op);
-                        
-                        // 나눗셈일 경우 나누어 떨어지는 수로 조정
-                        if(processed_op == 3'b011) begin
-                            processed_num2 <= temp_num2;
-                            if(process_num1(lfsr1_out, processed_op) % temp_num2 != 0) begin
-                                processed_num1 <= (process_num1(lfsr1_out, processed_op) / temp_num2) * temp_num2;
-                            end
-                        end else begin
-                            processed_num2 <= temp_num2;
-                        end
-                        
+                        processed_num2 <= process_num2(lfsr3_out, processed_op);
                         wait_count <= 0;
                     end
                 end
@@ -178,7 +203,7 @@ module ProblemGenerator(
                 end
                 
                 CHECK: begin
-                    if(alu_result <= 8'hFF && alu_result >= 8'h0) begin
+                    if(is_valid_result) begin
                         answer <= alu_result;
                         num1 <= processed_num1;
                         num2 <= processed_num2;
